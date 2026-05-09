@@ -31,7 +31,14 @@ public class OrderIntegrationRoute extends RouteBuilder {
         restConfiguration()
                 .component("platform-http")
                 .bindingMode(RestBindingMode.off) // ← turn off auto binding
-                .dataFormatProperty("prettyPrint", "true");
+                .dataFormatProperty("prettyPrint", "true")
+                .enableCORS(true)
+                .corsHeaderProperty("Access-Control-Allow-Origin",
+                        System.getenv().getOrDefault("CORS_ALLOWED_ORIGINS",
+                                "http://localhost:4200,http://localhost:4201,https://shopping-admin-production.up.railway.app,https://shopping-customer-production.up.railway.app"))
+                .corsHeaderProperty("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+                .corsHeaderProperty("Access-Control-Allow-Headers", "Authorization,Content-Type")
+                .corsHeaderProperty("Access-Control-Allow-Credentials", "true");
 
         // ── Expose POST /camel/orders ─────────────────────────────────
         rest("/camel/orders")
