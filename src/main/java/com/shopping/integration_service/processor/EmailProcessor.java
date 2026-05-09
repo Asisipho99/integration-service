@@ -21,7 +21,12 @@ public class EmailProcessor implements Processor {
 
     @Override
     public void process(Exchange exchange) throws Exception {
-        OrderRequest order = exchange.getIn().getBody(OrderRequest.class);
+        // OrderProcessor replaces the body with the order-service response,
+        // so retrieve the original OrderRequest from the exchange property
+        OrderRequest order = exchange.getProperty("originalOrder", OrderRequest.class);
+        if (order == null) {
+            order = exchange.getIn().getBody(OrderRequest.class);
+        }
 
         // Build the order confirmation email
         String subject = "Order Confirmation - Your order has been placed!";
