@@ -21,11 +21,11 @@ public class OrderIntegrationRoute extends RouteBuilder {
     public void configure() throws Exception {
 
         // ── Global error handler ──────────────────────────────────────
-        onException(RuntimeException.class)
+        onException(Exception.class)
                 .handled(true)
                 .setHeader("CamelHttpResponseCode", constant(400))
-                .setBody(simple("{\"error\": \"${exception.message}\"}"))
-                .log("ERROR in order route: ${exception.message}");
+                .setBody(simple("{\"error\": \"${exception.message}\", \"cause\": \"${exception.class.name}\"}"))
+                .log("ERROR in order route: ${exception.class.name}: ${exception.message}\n${exception.stackTrace}");
 
         // ── REST configuration ────────────────────────────────────────
         restConfiguration()
@@ -49,6 +49,9 @@ public class OrderIntegrationRoute extends RouteBuilder {
                     String json = exchange.getIn().getBody(String.class);
                     OrderRequest order = objectMapper.readValue(json, OrderRequest.class);
                     exchange.getIn().setBody(order);
+                    // Save the original order so EmailProcessor can access it after
+                    // OrderProcessor replaces the body with the order-service response
+                    exchange.setProperty("originalOrder", order);
                 })
 
                 .log("📦 New order received for customer: ${body.customerId}")
