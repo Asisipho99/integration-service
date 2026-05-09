@@ -33,8 +33,8 @@ public class OrderIntegrationRoute extends RouteBuilder {
                 .bindingMode(RestBindingMode.off) // ← turn off auto binding
                 .dataFormatProperty("prettyPrint", "true");
 
-        // ── Expose POST /camel/orders ─────────────────────────────────
-        rest("/camel/orders")
+        // ── Expose POST /api/orders ──────────────────────────────────
+        rest("/api/orders")
                 .post()
                 .consumes("application/json")
                 .produces("application/json")
