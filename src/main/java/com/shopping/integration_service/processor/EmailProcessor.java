@@ -95,14 +95,13 @@ public class EmailProcessor implements Processor {
                         + " @ R" + i.getUnitPrice())
                 .reduce("", (a, b) -> a.isEmpty() ? b : a + ", " + b);
 
-        EmailRequest req = new EmailRequest(
-                order.getCustomerEmail(),
-                "Order Confirmation - Your order has been placed!",
-                buildEmailBody(order),
-                "ORDER_CONFIRMATION"
-        );
+        EmailRequest req = new EmailRequest();
+        req.setTo(order.getCustomerEmail());
+        req.setSubject("Order Confirmation - Your order has been placed!");
+        req.setBody(buildEmailBody(order));
+        req.setType("ORDER_CONFIRMATION");
         req.setCustomerName(order.getCustomerName());
-        req.setOrderId(String.valueOf(order.getOrderId()));
+        req.setOrderId(order.getOrderId() != null ? String.valueOf(order.getOrderId()) : null);
         req.setProductList(productList);
         req.setTotalAmount(total);
         return req;
