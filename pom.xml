@@ -73,6 +73,16 @@
 			<artifactId>camel-platform-http-starter</artifactId>
 			<version>4.8.5</version>
 		</dependency>
+
+		<!-- Spring Retry — for email retry with exponential backoff -->
+		<dependency>
+			<groupId>org.springframework.retry</groupId>
+			<artifactId>spring-retry</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-aspects</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
