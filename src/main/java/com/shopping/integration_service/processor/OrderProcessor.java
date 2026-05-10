@@ -1,5 +1,7 @@
 package com.shopping.integration_service.processor;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shopping.integration_service.dto.OrderRequest;
 import lombok.RequiredArgsConstructor;
 import org.apache.camel.Exchange;
@@ -13,7 +15,8 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 public class OrderProcessor implements Processor {
 
-    private final RestTemplate restTemplate;
+    private final RestTemplate  restTemplate;
+    private final ObjectMapper  objectMapper;
 
     @Value("${services.order-service}")
     private String orderServiceUrl;
@@ -33,7 +36,21 @@ public class OrderProcessor implements Processor {
                 String.class
         );
 
-        // Pass the response body (orderId etc) forward in the route
+        // Extract the orderId from the response and store it on the original
+        // OrderRequest so EmailProcessor can include it in the confirmation email
+        try {
+            JsonNode json = objectMapper.readTree(response.getBody());
+            if (json.has("orderId")) {
+                order.setOrderId(json.get("orderId").asLong());
+                // Update the exchange property so EmailProcessor gets the enriched order
+                exchange.setProperty("originalOrder", order);
+            }
+        } catch (Exception e) {
+            // Non-critical — email will still send, just without the order ID
+            System.err.println("Could not parse orderId from order-service response: "
+                    + e.getMessage());
+        }
+
         exchange.getIn().setBody(response.getBody());
         exchange.getIn().setHeader("orderResponse", response.getBody());
     }

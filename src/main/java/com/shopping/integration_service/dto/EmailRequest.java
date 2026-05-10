@@ -12,4 +12,11 @@ public class EmailRequest {
     private String subject;
     private String body;
     private String type; // REGISTRATION, ORDER_CONFIRMATION, STATUS_UPDATE
+
+    // Template enrichment fields — populated by EmailProcessor
+    private String customerName;
+    private String orderId;
+    private String orderStatus;
+    private String productList;
+    private Double totalAmount;
 }
