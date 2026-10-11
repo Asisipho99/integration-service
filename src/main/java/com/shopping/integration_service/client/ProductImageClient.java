@@ -2,7 +2,7 @@ package com.shopping.integration_service.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -24,11 +24,23 @@ import java.util.Map;
  * never throws.
  */
 @Component
-@RequiredArgsConstructor
 public class ProductImageClient {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+
+    /**
+     * Takes the short-timeout client on purpose. These lookups sit inline on
+     * the synchronous checkout path and only decide whether a thumbnail
+     * appears in an email, so they must never hold an order open waiting on a
+     * slow product-service. The shared RestTemplate has no timeouts.
+     */
+    public ProductImageClient(
+            @Qualifier("productImageRestTemplate") RestTemplate restTemplate,
+            ObjectMapper objectMapper) {
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
+    }
 
     @Value("${services.product-service}")
     private String productServiceUrl;
