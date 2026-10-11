@@ -1,5 +1,6 @@
 package com.shopping.integration_service.processor;
 
+import com.shopping.integration_service.client.ProductImageClient;
 import com.shopping.integration_service.dto.EmailRequest;
 import com.shopping.integration_service.dto.OrderRequest;
 import lombok.RequiredArgsConstructor;
@@ -14,11 +15,21 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
 @Component
 @RequiredArgsConstructor
 public class EmailProcessor implements Processor {
 
     private final RestTemplate restTemplate;
+    private final ProductImageClient productImageClient;
 
     @Value("${services.email-service}")
     private String emailServiceUrl;
@@ -85,7 +96,8 @@ public class EmailProcessor implements Processor {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private EmailRequest buildEmailRequest(OrderRequest order) {
+    // Package-private so EmailProcessorTest can exercise the enrichment directly
+    EmailRequest buildEmailRequest(OrderRequest order) {
         double total = order.getItems().stream()
                 .mapToDouble(i -> i.getQuantity() * i.getUnitPrice())
                 .sum();
@@ -104,7 +116,54 @@ public class EmailProcessor implements Processor {
         req.setOrderId(order.getOrderId() != null ? String.valueOf(order.getOrderId()) : null);
         req.setProductList(productList);
         req.setTotalAmount(total);
+        req.setItems(buildItemLines(order));
         return req;
+    }
+
+    /**
+     * One rendered line per ordered item, with the product image resolved from
+     * the Product Service. Image resolution is decoration: when it fails the
+     * lines are still built with a null imageUrl, so nothing here can throw
+     * into the Camel route and turn a placed order into a 400.
+     */
+    private List<EmailRequest.OrderItemLine> buildItemLines(OrderRequest order) {
+        Map<Long, String> imageUrls = resolveImageUrls(order);
+
+        List<EmailRequest.OrderItemLine> lines = new ArrayList<>();
+        for (OrderRequest.OrderItem item : order.getItems()) {
+            BigDecimal unitPrice = item.getUnitPrice() != null
+                    ? BigDecimal.valueOf(item.getUnitPrice())
+                    : null;
+            BigDecimal lineTotal = (unitPrice != null && item.getQuantity() != null)
+                    ? unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()))
+                    : null;
+
+            lines.add(new EmailRequest.OrderItemLine(
+                    item.getProductName(),
+                    item.getQuantity(),
+                    unitPrice,
+                    lineTotal,
+                    imageUrls.get(item.getProductId())
+            ));
+        }
+        return lines;
+    }
+
+    private Map<Long, String> resolveImageUrls(OrderRequest order) {
+        try {
+            Set<Long> productIds = new LinkedHashSet<>();
+            for (OrderRequest.OrderItem item : order.getItems()) {
+                if (item.getProductId() != null) {
+                    productIds.add(item.getProductId());
+                }
+            }
+            return productImageClient.fetchImageUrls(productIds);
+        } catch (Exception e) {
+            // Non-critical — the email still lists every item, just without images
+            System.err.println("Could not resolve product images for order "
+                    + order.getOrderId() + ": " + e.getMessage());
+            return Collections.emptyMap();
+        }
     }
 
     private String buildEmailBody(OrderRequest order) {
@@ -117,14 +176,22 @@ public class EmailProcessor implements Processor {
             double itemTotal = item.getQuantity() * item.getUnitPrice();
             sb.append("- ").append(item.getProductName())
                     .append(" x").append(item.getQuantity())
-                    .append(" @ R").append(item.getUnitPrice())
-                    .append(" = R").append(itemTotal).append("\n");
+                    .append(" @ ").append(formatRand(item.getUnitPrice()))
+                    .append(" = ").append(formatRand(itemTotal)).append("\n");
             total += itemTotal;
         }
 
-        sb.append("\nTotal: R").append(total);
+        sb.append("\nTotal: ").append(formatRand(total));
         sb.append("\n\nYour order is being processed.");
         sb.append("\n\nThank you for shopping with us!");
         return sb.toString();
+    }
+
+    /**
+     * Rand amounts as R 1,234.56. The locale is pinned so the plain-text part
+     * matches the HTML the email service renders, whatever the JVM default is.
+     */
+    private static String formatRand(double amount) {
+        return "R " + String.format(Locale.US, "%,.2f", amount);
     }
 }
